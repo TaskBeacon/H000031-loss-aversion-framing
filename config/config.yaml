@@ -1,0 +1,283 @@
+subinfo_fields:
+  - name: subject_id
+    type: int
+    constraints:
+      min: 101
+      max: 999
+      digits: 3
+
+subinfo_mapping:
+  subject_id: 受试者编号（3位）
+  Participant Information: 被试信息
+  registration_failed: 注册失败
+  registration_successful: 注册成功
+  invalid_input: "{field} 输入无效"
+
+window:
+  size: [1280, 720]
+  units: pix
+  screen: 0
+  bg_color: gray
+  fullscreen: true
+  fullscreen_lock_escape: true
+  monitor_width_cm: 35.5
+  monitor_distance_cm: 60
+
+task:
+  task_name: loss_aversion_framing_preview
+  delta: 1
+  save_path: ./outputs/human
+  total_blocks: 3
+  total_trials: 96
+  trial_per_block: 32
+  conditions:
+    - gain_frame
+    - loss_frame
+    - mixed_frame
+  key_list:
+    - f
+    - j
+    - space
+  safe_key: f
+  gamble_key: j
+  choice_labels:
+    safe: 方案A（确定）
+    gamble: 方案B（风险）
+  feedback_choice_template: "你选择了 {choice_label}"
+  seed_mode: same_across_sub
+  overall_seed: 2025
+  language: Chinese
+  voice_name: zh-CN-YunyangNeural
+  voice_enabled: false
+  input_mode: keyboard
+  hide_cursor: true
+  force_quit_enabled: true
+  force_quit_shortcut: ctrl+q
+
+timing:
+  fixation_duration: [0.4, 0.7]
+  decision_deadline: 4.0
+  feedback_duration: 0.7
+  iti_duration: [0.4, 0.8]
+
+stimuli:
+  instruction_text:
+    type: text
+    text: |
+      损失厌恶与框架任务
+
+      每一试次你会看到两个方案：
+      方案A（确定）与方案B（风险）。
+
+      按 F 选择方案A，按 J 选择方案B。
+      请尽量根据直觉做出选择。
+
+      按空格键开始。
+    color: white
+    height: 28
+    wrapWidth: 980
+    pos: [0, 80]
+    font: SimHei
+
+  fixation:
+    type: text
+    text: "+"
+    color: white
+    height: 44
+    pos: [0, 0]
+    font: SimHei
+
+  frame_label:
+    type: text
+    text: "{frame_label}"
+    color: "#f2e64c"
+    height: 34
+    pos: [0, 255]
+    wrapWidth: 880
+    font: SimHei
+
+  scenario_text:
+    type: text
+    text: "{scenario_text}"
+    color: white
+    height: 30
+    pos: [0, 170]
+    wrapWidth: 960
+    font: SimHei
+
+  safe_option_text:
+    type: text
+    text: "{safe_option_text}"
+    color: "#59e659"
+    height: 30
+    pos: [-320, 20]
+    wrapWidth: 360
+    font: SimHei
+
+  gamble_option_text:
+    type: text
+    text: "{gamble_option_text}"
+    color: "#59bff2"
+    height: 30
+    pos: [320, 20]
+    wrapWidth: 360
+    font: SimHei
+
+  key_hint:
+    type: text
+    text: "按 {safe_key} 选方案A（确定）    按 {gamble_key} 选方案B（风险）"
+    color: white
+    height: 24
+    pos: [0, -220]
+    wrapWidth: 980
+    font: SimHei
+
+  feedback_choice:
+    type: text
+    text: "{chosen_text}"
+    color: white
+    height: 34
+    wrapWidth: 960
+    pos: [0, -20]
+    font: SimHei
+
+  feedback_timeout:
+    type: text
+    text: "超时：本试次未作答"
+    color: "#ff7373"
+    height: 34
+    wrapWidth: 960
+    pos: [0, -20]
+    font: SimHei
+
+  block_break:
+    type: text
+    text: |
+      第 {block_num}/{total_blocks} 组完成
+
+      风险选择率：{block_gamble_rate}
+      平均反应时：{mean_rt_ms} ms
+      超时次数：{timeout_count}
+
+      按空格键继续。
+    color: white
+    height: 26
+    wrapWidth: 980
+    font: SimHei
+
+  good_bye:
+    type: text
+    text: |
+      任务结束
+
+      总试次：{total_trials}
+      风险选择率：{overall_gamble_rate}
+      平均反应时：{mean_rt_ms} ms
+      超时次数：{timeout_count}
+
+      收益框架风险率：{gain_rate}
+      损失框架风险率：{loss_rate}
+      混合框架风险率：{mixed_rate}
+
+      按空格键退出。
+    color: white
+    height: 26
+    wrapWidth: 980
+    font: SimHei
+
+triggers:
+  map:
+    exp_onset: 1
+    exp_end: 2
+    block_onset: 10
+    block_end: 11
+    fixation_onset: 20
+    decision_onset: 30
+    choice_safe: 31
+    choice_gamble: 32
+    choice_timeout: 33
+    feedback_onset: 40
+    iti_onset: 50
+
+  driver:
+    type: serial_url
+    url: loop://
+    baudrate: 115200
+
+  timing:
+    post_delay_ms: 1
+
+  policy:
+    strict: false
+
+controller:
+  fixation_duration: [0.4, 0.7]
+  decision_deadline: 4.0
+  feedback_duration: 0.7
+  iti_duration: [0.4, 0.8]
+  random_seed: null
+  enable_logging: true
+  gain_trials:
+    - offer_id: gain_100_80
+      endowment: 100
+      sure_keep: 80
+      gamble_keep: 100
+      gamble_prob: 0.8
+    - offer_id: gain_100_60
+      endowment: 100
+      sure_keep: 60
+      gamble_keep: 100
+      gamble_prob: 0.6
+    - offer_id: gain_120_72
+      endowment: 120
+      sure_keep: 72
+      gamble_keep: 120
+      gamble_prob: 0.6
+    - offer_id: gain_150_105
+      endowment: 150
+      sure_keep: 105
+      gamble_keep: 150
+      gamble_prob: 0.7
+  loss_trials:
+    - offer_id: loss_100_20
+      endowment: 100
+      sure_loss: 20
+      gamble_loss: 100
+      gamble_loss_prob: 0.2
+    - offer_id: loss_100_40
+      endowment: 100
+      sure_loss: 40
+      gamble_loss: 100
+      gamble_loss_prob: 0.4
+    - offer_id: loss_120_36
+      endowment: 120
+      sure_loss: 36
+      gamble_loss: 120
+      gamble_loss_prob: 0.3
+    - offer_id: loss_150_45
+      endowment: 150
+      sure_loss: 45
+      gamble_loss: 150
+      gamble_loss_prob: 0.3
+  mixed_trials:
+    - offer_id: mixed_40_30
+      sure_amount: 0
+      gamble_gain: 40
+      gamble_loss: 30
+      gamble_gain_prob: 0.5
+    - offer_id: mixed_60_45
+      sure_amount: 0
+      gamble_gain: 60
+      gamble_loss: 45
+      gamble_gain_prob: 0.5
+    - offer_id: mixed_30_20
+      sure_amount: 0
+      gamble_gain: 30
+      gamble_loss: 20
+      gamble_gain_prob: 0.4
+    - offer_id: mixed_70_50
+      sure_amount: 10
+      gamble_gain: 70
+      gamble_loss: 50
+      gamble_gain_prob: 0.5
+

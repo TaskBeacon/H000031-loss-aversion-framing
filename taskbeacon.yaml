@@ -1,0 +1,16 @@
+id: H000031
+slug: loss-aversion-framing
+title: Loss Aversion / Framing Task
+acquisition: behavior
+variant: html
+cognitive_domain:
+  - decision_making
+  - value_based_choice
+  - framing_effect
+maturity: prototype
+version:
+  release_tag: "0.1.0"
+contracts:
+  psyflow_web_taps: v0.1.0
+maintainer: []
+
