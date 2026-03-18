@@ -49,6 +49,71 @@ task:
   language: Chinese
   voice_name: zh-CN-YunyangNeural
   voice_enabled: false
+  enable_logging: true
+  offer_banks:
+    gain_frame:
+      - offer_id: gain_100_80
+        endowment: 100
+        sure_keep: 80
+        gamble_keep: 100
+        gamble_prob: 0.8
+      - offer_id: gain_100_60
+        endowment: 100
+        sure_keep: 60
+        gamble_keep: 100
+        gamble_prob: 0.6
+      - offer_id: gain_120_72
+        endowment: 120
+        sure_keep: 72
+        gamble_keep: 120
+        gamble_prob: 0.6
+      - offer_id: gain_150_105
+        endowment: 150
+        sure_keep: 105
+        gamble_keep: 150
+        gamble_prob: 0.7
+    loss_frame:
+      - offer_id: loss_100_20
+        endowment: 100
+        sure_loss: 20
+        gamble_loss: 100
+        gamble_loss_prob: 0.2
+      - offer_id: loss_100_40
+        endowment: 100
+        sure_loss: 40
+        gamble_loss: 100
+        gamble_loss_prob: 0.4
+      - offer_id: loss_120_36
+        endowment: 120
+        sure_loss: 36
+        gamble_loss: 120
+        gamble_loss_prob: 0.3
+      - offer_id: loss_150_45
+        endowment: 150
+        sure_loss: 45
+        gamble_loss: 150
+        gamble_loss_prob: 0.3
+    mixed_frame:
+      - offer_id: mixed_40_30
+        sure_amount: 0
+        gamble_gain: 40
+        gamble_loss: 30
+        gamble_gain_prob: 0.5
+      - offer_id: mixed_60_45
+        sure_amount: 0
+        gamble_gain: 60
+        gamble_loss: 45
+        gamble_gain_prob: 0.5
+      - offer_id: mixed_30_20
+        sure_amount: 0
+        gamble_gain: 30
+        gamble_loss: 20
+        gamble_gain_prob: 0.4
+      - offer_id: mixed_70_50
+        sure_amount: 10
+        gamble_gain: 70
+        gamble_loss: 50
+        gamble_gain_prob: 0.5
   input_mode: keyboard
   hide_cursor: true
   force_quit_enabled: true
@@ -209,75 +274,3 @@ triggers:
 
   policy:
     strict: false
-
-controller:
-  fixation_duration: [0.4, 0.7]
-  decision_deadline: 4.0
-  feedback_duration: 0.7
-  iti_duration: [0.4, 0.8]
-  random_seed: null
-  enable_logging: true
-  gain_trials:
-    - offer_id: gain_100_80
-      endowment: 100
-      sure_keep: 80
-      gamble_keep: 100
-      gamble_prob: 0.8
-    - offer_id: gain_100_60
-      endowment: 100
-      sure_keep: 60
-      gamble_keep: 100
-      gamble_prob: 0.6
-    - offer_id: gain_120_72
-      endowment: 120
-      sure_keep: 72
-      gamble_keep: 120
-      gamble_prob: 0.6
-    - offer_id: gain_150_105
-      endowment: 150
-      sure_keep: 105
-      gamble_keep: 150
-      gamble_prob: 0.7
-  loss_trials:
-    - offer_id: loss_100_20
-      endowment: 100
-      sure_loss: 20
-      gamble_loss: 100
-      gamble_loss_prob: 0.2
-    - offer_id: loss_100_40
-      endowment: 100
-      sure_loss: 40
-      gamble_loss: 100
-      gamble_loss_prob: 0.4
-    - offer_id: loss_120_36
-      endowment: 120
-      sure_loss: 36
-      gamble_loss: 120
-      gamble_loss_prob: 0.3
-    - offer_id: loss_150_45
-      endowment: 150
-      sure_loss: 45
-      gamble_loss: 150
-      gamble_loss_prob: 0.3
-  mixed_trials:
-    - offer_id: mixed_40_30
-      sure_amount: 0
-      gamble_gain: 40
-      gamble_loss: 30
-      gamble_gain_prob: 0.5
-    - offer_id: mixed_60_45
-      sure_amount: 0
-      gamble_gain: 60
-      gamble_loss: 45
-      gamble_gain_prob: 0.5
-    - offer_id: mixed_30_20
-      sure_amount: 0
-      gamble_gain: 30
-      gamble_loss: 20
-      gamble_gain_prob: 0.4
-    - offer_id: mixed_70_50
-      sure_amount: 10
-      gamble_gain: 70
-      gamble_loss: 50
-      gamble_gain_prob: 0.5
-

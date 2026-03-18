@@ -1,31 +1,81 @@
 import {
-  set_trial_context,
   type StimBank,
   type TaskSettings,
   type TrialBuilder,
   type TrialSnapshot
 } from "psyflow-web";
 
-import {
-  CHOICE_GAMBLE,
-  CHOICE_SAFE,
-  Controller,
-  type Offer
-} from "./controller";
+import { CHOICE_GAMBLE, CHOICE_SAFE, normalizeCondition, sampleOffer } from "./utils";
 
-interface TrialOutcome {
-  response_key: string;
-  chosen_option: string;
-  timed_out: boolean;
-  rt_s: number | null;
-  chose_gamble: boolean | null;
-  feedback_text: string;
+interface DecisionOutcome {
+  responseKey: string;
+  chosenOption: string;
+  timedOut: boolean;
+  rtS: number | null;
+  choseGamble: boolean | null;
 }
 
 function normalizeKey(value: unknown): string {
   return String(value ?? "")
     .trim()
     .toLowerCase();
+}
+
+function asNumber(value: unknown): number | null {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function getTriggerCode(triggerMap: Record<string, unknown>, key: string, fallback: number): number {
+  const value = Number(triggerMap[key]);
+  return Number.isFinite(value) ? value : fallback;
+}
+
+function resolveDuration(value: unknown, fallback: number | number[]): number | number[] {
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return value;
+  }
+  if (Array.isArray(value) && value.length > 0) {
+    if (value.length === 1) {
+      const parsed = Number(value[0]);
+      return Number.isFinite(parsed) ? parsed : fallback;
+    }
+    if (value.length >= 2) {
+      const a = Number(value[0]);
+      const b = Number(value[1]);
+      if (Number.isFinite(a) && Number.isFinite(b)) {
+        return [a, b];
+      }
+    }
+  }
+  return fallback;
+}
+
+function resolveNumber(value: unknown, fallback: number): number {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : fallback;
+}
+
+function readDecisionOutcome(snapshot: TrialSnapshot, safeKey: string, gambleKey: string): DecisionOutcome {
+  const responseKey = normalizeKey(snapshot.units.decision?.response);
+  const timedOut = responseKey !== safeKey && responseKey !== gambleKey;
+  if (timedOut) {
+    return {
+      responseKey: "",
+      chosenOption: "",
+      timedOut: true,
+      rtS: asNumber(snapshot.units.decision?.rt ?? snapshot.units.decision?.response_time),
+      choseGamble: null
+    };
+  }
+  const choseGamble = responseKey === gambleKey;
+  return {
+    responseKey,
+    chosenOption: choseGamble ? CHOICE_GAMBLE : CHOICE_SAFE,
+    timedOut: false,
+    rtS: asNumber(snapshot.units.decision?.rt ?? snapshot.units.decision?.response_time),
+    choseGamble
+  };
 }
 
 function toRecord(value: unknown): Record<string, unknown> {
@@ -35,60 +85,65 @@ function toRecord(value: unknown): Record<string, unknown> {
   return value as Record<string, unknown>;
 }
 
-function getOutcome(snapshot: TrialSnapshot): TrialOutcome | null {
-  const value = snapshot.units.trial_outcome?.outcome_payload;
-  if (!value || typeof value !== "object") {
-    return null;
-  }
-  return value as TrialOutcome;
-}
-
 export function run_trial(
   trial: TrialBuilder,
   condition: string,
   context: {
     settings: TaskSettings;
     stimBank: StimBank;
-    controller: Controller;
     block_id: string;
     block_idx: number;
   }
 ): TrialBuilder {
-  const { settings, stimBank, controller, block_id, block_idx } = context;
-  const conditionName = Controller.parse_condition(condition);
-  const offer: Offer = controller.sample_offer(conditionName);
+  const { settings, stimBank, block_id, block_idx } = context;
+  const conditionName = normalizeCondition(condition);
+  const trialId = Number(trial.trial_id);
+  const resolvedTrialId = Number.isFinite(trialId) ? trialId : 0;
+  const trialIndex = Number(trial.trial_index);
+  const resolvedTrialIndex = Number.isFinite(trialIndex) ? trialIndex : 0;
+  const blockTrialNumber = resolvedTrialIndex + 1;
+
   const triggerMap = (settings.triggers ?? {}) as Record<string, unknown>;
-  const safeKey = normalizeKey(settings.safe_key ?? "f");
-  const gambleKey = normalizeKey(settings.gamble_key ?? "j");
+  const choiceSafeTrigger = getTriggerCode(triggerMap, "choice_safe", 31);
+  const choiceGambleTrigger = getTriggerCode(triggerMap, "choice_gamble", 32);
+  const choiceTimeoutTrigger = getTriggerCode(triggerMap, "choice_timeout", 33);
+
+  const safeKey = String(settings.safe_key ?? "f").trim().toLowerCase();
+  const gambleKey = String(settings.gamble_key ?? "j").trim().toLowerCase();
   const responseKeys = [safeKey, gambleKey];
   const choiceLabels = toRecord(settings.choice_labels);
   const safeLabel = String(choiceLabels[CHOICE_SAFE] ?? CHOICE_SAFE);
   const gambleLabel = String(choiceLabels[CHOICE_GAMBLE] ?? CHOICE_GAMBLE);
   const feedbackTemplate = String(settings.feedback_choice_template ?? "你选择了 {choice_label}");
 
-  const fixationDuration = controller.sample_duration(settings.fixation_duration, 0.5);
-  const decisionDeadline = Math.max(0.2, Number(settings.decision_deadline ?? 4.0));
-  const feedbackDuration = Math.max(0.1, Number(settings.feedback_duration ?? 0.7));
-  const itiDuration = controller.sample_duration(settings.iti_duration, 0.5);
+  const offer = sampleOffer(settings, conditionName, block_idx, resolvedTrialId, resolvedTrialIndex);
+  const fixationDuration = resolveDuration(settings.fixation_duration, 0.5);
+  const decisionDeadline = resolveNumber(settings.decision_deadline, 4.0);
+  const feedbackDuration = resolveNumber(settings.feedback_duration, 0.7);
+  const itiDuration = resolveDuration(settings.iti_duration, 0.5);
 
-  const fixation = trial.unit("fixation").addStim(stimBank.get("fixation"));
-  set_trial_context(fixation, {
-    trial_id: trial.trial_id,
-    phase: "fixation",
-    deadline_s: fixationDuration,
-    valid_keys: [],
-    block_id,
-    condition_id: conditionName,
-    task_factors: {
-      stage: "fixation",
-      offer_id: offer.offer_id,
-      block_idx
-    },
-    stim_id: "fixation"
-  });
-  fixation.show({ duration: fixationDuration }).to_dict();
+  trial
+    .unit("fixation")
+    .addStim(stimBank.get("fixation"))
+    .setContext({
+      trial_id: trialId,
+      phase: "fixation",
+      deadline_s: fixationDuration,
+      valid_keys: [],
+      block_id,
+      condition_id: conditionName,
+      task_factors: {
+        stage: "fixation",
+        offer_id: offer.offer_id,
+        block_idx,
+        trial_id: trialId
+      },
+      stim_id: "fixation"
+    })
+    .show({ duration: fixationDuration })
+    .to_dict();
 
-  const decision = trial
+  trial
     .unit("decision")
     .addStim(
       stimBank.get_and_format("frame_label", {
@@ -115,175 +170,99 @@ export function run_trial(
         safe_key: safeKey.toUpperCase(),
         gamble_key: gambleKey.toUpperCase()
       })
-    );
-  set_trial_context(decision, {
-    trial_id: trial.trial_id,
-    phase: "decision",
-    deadline_s: decisionDeadline,
-    valid_keys: responseKeys,
-    block_id,
-    condition_id: conditionName,
-    task_factors: {
-      stage: "decision",
-      offer_id: offer.offer_id,
-      safe_key: safeKey,
-      gamble_key: gambleKey,
-      block_idx
-    },
-    stim_id: "frame_label+scenario_text+safe_option_text+gamble_option_text+key_hint"
-  });
-  decision
+    )
+    .setContext({
+      trial_id: trialId,
+      phase: "decision",
+      deadline_s: decisionDeadline,
+      valid_keys: responseKeys,
+      block_id,
+      condition_id: conditionName,
+      task_factors: {
+        stage: "decision",
+        offer_id: offer.offer_id,
+        safe_key: safeKey,
+        gamble_key: gambleKey,
+        block_idx,
+        trial_id: trialId,
+        block_trial_index: blockTrialNumber
+      },
+      stim_id: "frame_label+scenario_text+safe_option_text+gamble_option_text+key_hint"
+    })
     .captureResponse({
       keys: responseKeys,
       correct_keys: responseKeys,
       duration: decisionDeadline,
       response_trigger: {
-        [safeKey]: Number(triggerMap.choice_safe ?? 31),
-        [gambleKey]: Number(triggerMap.choice_gamble ?? 32)
+        [safeKey]: choiceSafeTrigger,
+        [gambleKey]: choiceGambleTrigger
       },
-      timeout_trigger: Number(triggerMap.choice_timeout ?? 33)
-    })
-    .set_state({
-      response_key: (snapshot: TrialSnapshot) => normalizeKey(snapshot.units.decision?.response),
-      timed_out: (snapshot: TrialSnapshot) => {
-        const key = normalizeKey(snapshot.units.decision?.response);
-        return key !== safeKey && key !== gambleKey;
-      },
-      rt_s: (snapshot: TrialSnapshot) => {
-        const rt = Number(snapshot.units.decision?.rt);
-        return Number.isFinite(rt) ? rt : null;
-      },
-      chosen_option: (snapshot: TrialSnapshot) => {
-        const key = normalizeKey(snapshot.units.decision?.response);
-        if (key === safeKey) {
-          return CHOICE_SAFE;
-        }
-        if (key === gambleKey) {
-          return CHOICE_GAMBLE;
-        }
-        return "";
-      },
-      chose_gamble: (snapshot: TrialSnapshot) => {
-        const key = normalizeKey(snapshot.units.decision?.response);
-        if (key === safeKey) {
-          return false;
-        }
-        if (key === gambleKey) {
-          return true;
-        }
-        return null;
-      }
+      timeout_trigger: choiceTimeoutTrigger
     })
     .to_dict();
 
-  const trialOutcome = trial.unit("trial_outcome");
-  set_trial_context(trialOutcome, {
-    trial_id: trial.trial_id,
-    phase: "trial_outcome",
-    deadline_s: 0,
-    valid_keys: [],
-    block_id,
-    condition_id: conditionName,
-    task_factors: {
-      stage: "trial_outcome",
-      offer_id: offer.offer_id,
-      block_idx
-    },
-    stim_id: "trial_outcome"
-  });
-  trialOutcome
-    .show({
-      duration: 0
-    })
-    .set_state({
-      outcome_payload: (snapshot: TrialSnapshot) => {
-        const responseKey = normalizeKey(snapshot.units.decision?.response_key);
-        const timedOut = responseKey !== safeKey && responseKey !== gambleKey;
-        if (timedOut) {
-          return {
-            response_key: "",
-            chosen_option: "",
-            timed_out: true,
-            rt_s: snapshot.units.decision?.rt_s as number | null,
-            chose_gamble: null,
-            feedback_text: ""
-          } satisfies TrialOutcome;
-        }
-        const choseGamble = responseKey === gambleKey;
-        const choiceLabel = choseGamble ? gambleLabel : safeLabel;
-        return {
-          response_key: responseKey,
-          chosen_option: choseGamble ? CHOICE_GAMBLE : CHOICE_SAFE,
-          timed_out: false,
-          rt_s: snapshot.units.decision?.rt_s as number | null,
-          chose_gamble: choseGamble,
-          feedback_text: feedbackTemplate.replace("{choice_label}", choiceLabel)
-        } satisfies TrialOutcome;
+  trial
+    .unit("feedback")
+    .addStim((snapshot: TrialSnapshot) => {
+      const outcome = readDecisionOutcome(snapshot, safeKey, gambleKey);
+      if (outcome.timedOut) {
+        return stimBank.get("feedback_timeout");
       }
-    });
-
-  const feedback = trial.unit("feedback").addStim((snapshot: TrialSnapshot) => {
-    const outcome = getOutcome(snapshot);
-    if (!outcome || outcome.timed_out) {
-      return stimBank.get("feedback_timeout");
-    }
-    return stimBank.get_and_format("feedback_choice", {
-      chosen_text: outcome.feedback_text
-    });
-  });
-  set_trial_context(feedback, {
-    trial_id: trial.trial_id,
-    phase: "feedback",
-    deadline_s: feedbackDuration,
-    valid_keys: [],
-    block_id,
-    condition_id: conditionName,
-    task_factors: {
-      stage: "feedback",
-      offer_id: offer.offer_id,
-      block_idx
-    },
-    stim_id: "feedback"
-  });
-  feedback
+      const choiceLabel = outcome.choseGamble ? gambleLabel : safeLabel;
+      const chosenText = feedbackTemplate.replace("{choice_label}", choiceLabel);
+      return stimBank.get_and_format("feedback_choice", {
+        chosen_text: chosenText
+      });
+    })
+    .setContext({
+      trial_id: trialId,
+      phase: "feedback",
+      deadline_s: feedbackDuration,
+      valid_keys: [],
+      block_id,
+      condition_id: conditionName,
+      task_factors: {
+        stage: "feedback",
+        offer_id: offer.offer_id,
+        block_idx,
+        trial_id: trialId,
+        block_trial_index: blockTrialNumber
+      },
+      stim_id: "feedback"
+    })
     .show({ duration: feedbackDuration })
-    .set_state({
-      response_key: (snapshot: TrialSnapshot) => getOutcome(snapshot)?.response_key ?? "",
-      chosen_option: (snapshot: TrialSnapshot) => getOutcome(snapshot)?.chosen_option ?? "",
-      timed_out: (snapshot: TrialSnapshot) => getOutcome(snapshot)?.timed_out ?? true,
-      rt_s: (snapshot: TrialSnapshot) => getOutcome(snapshot)?.rt_s ?? null,
-      chose_gamble: (snapshot: TrialSnapshot) => getOutcome(snapshot)?.chose_gamble ?? null
-    })
     .to_dict();
 
-  const iti = trial.unit("iti").addStim(stimBank.get("fixation"));
-  set_trial_context(iti, {
-    trial_id: trial.trial_id,
-    phase: "iti",
-    deadline_s: itiDuration,
-    valid_keys: [],
-    block_id,
-    condition_id: conditionName,
-    task_factors: {
-      stage: "iti",
-      block_idx
-    },
-    stim_id: "fixation"
-  });
-  iti.show({ duration: itiDuration }).to_dict();
+  trial
+    .unit("iti")
+    .addStim(stimBank.get("fixation"))
+    .setContext({
+      trial_id: trialId,
+      phase: "iti",
+      deadline_s: itiDuration,
+      valid_keys: [],
+      block_id,
+      condition_id: conditionName,
+      task_factors: {
+        stage: "iti",
+        block_idx,
+        trial_id: trialId,
+        block_trial_index: blockTrialNumber
+      },
+      stim_id: "fixation"
+    })
+    .show({ duration: itiDuration })
+    .to_dict();
 
   trial.finalize((snapshot, _runtime, helpers) => {
-    const outcome = getOutcome(snapshot);
-    const choseGamble = outcome?.chose_gamble ?? null;
-    const rtS = outcome?.rt_s ?? null;
-    const timedOut = outcome?.timed_out ?? true;
+    const outcome = readDecisionOutcome(snapshot, safeKey, gambleKey);
     helpers.setTrialState("condition", conditionName);
     helpers.setTrialState("offer_id", offer.offer_id);
-    helpers.setTrialState("response_key", outcome?.response_key ?? "");
-    helpers.setTrialState("chosen_option", outcome?.chosen_option ?? "");
-    helpers.setTrialState("timed_out", timedOut);
-    helpers.setTrialState("rt_s", rtS);
-    helpers.setTrialState("chose_gamble", choseGamble);
+    helpers.setTrialState("response_key", outcome.responseKey);
+    helpers.setTrialState("chosen_option", outcome.chosenOption);
+    helpers.setTrialState("timed_out", outcome.timedOut);
+    helpers.setTrialState("rt_s", outcome.rtS);
+    helpers.setTrialState("chose_gamble", outcome.choseGamble);
     helpers.setTrialState("safe_key", safeKey);
     helpers.setTrialState("gamble_key", gambleKey);
     helpers.setTrialState("frame_label", offer.frame_label);
@@ -297,15 +276,7 @@ export function run_trial(
     helpers.setTrialState("gamble_gain", offer.gamble_gain);
     helpers.setTrialState("gamble_loss", offer.gamble_loss);
     helpers.setTrialState("gamble_gain_prob", offer.gamble_gain_prob);
-
-    controller.record_trial({
-      condition: conditionName,
-      chose_gamble: choseGamble,
-      rt_s: rtS,
-      timed_out: timedOut
-    });
   });
 
   return trial;
 }
-

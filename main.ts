@@ -18,7 +18,6 @@ import {
 } from "psyflow-web";
 
 import configText from "./config/config.yaml?raw";
-import { Controller } from "./src/controller";
 import { run_trial } from "./src/run_trial";
 import { summarizeBlock, summarizeConditionRates, summarizeOverall } from "./src/utils";
 
@@ -43,10 +42,8 @@ export async function run(root: HTMLElement): Promise<void> {
   const settings = TaskSettings.from_dict(parsed.task_config);
   const subInfo = new SubInfo(parsed.subform_config);
   const stimBank = new StimBank(parsed.stim_config);
-  const controller = Controller.from_dict(parsed.controller_config);
 
   settings.triggers = parsed.trigger_config;
-  settings.controller = parsed.controller_config;
 
   if (settings.voice_enabled) {
     stimBank.convert_to_voice("instruction_text", {
@@ -90,7 +87,6 @@ export async function run(root: HTMLElement): Promise<void> {
 
       for (let blockIndex = 0; blockIndex < totalBlocks; blockIndex += 1) {
         const blockId = `block_${blockIndex}`;
-        controller.start_block(blockIndex);
 
         compiledTrials.push(
           ...count_down({
@@ -118,7 +114,6 @@ export async function run(root: HTMLElement): Promise<void> {
           run_trial(trial, String(condition), {
             settings,
             stimBank,
-            controller,
             block_id: blockId,
             block_idx: blockIndex
           });
@@ -190,4 +185,3 @@ export async function main(root: HTMLElement): Promise<void> {
 }
 
 export default main;
-
