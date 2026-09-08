@@ -265,9 +265,8 @@ triggers:
     iti_onset: 50
 
   driver:
-    type: serial_url
-    url: loop://
-    baudrate: 115200
+    type: mock
+    print_codes: true
 
   timing:
     post_delay_ms: 1
